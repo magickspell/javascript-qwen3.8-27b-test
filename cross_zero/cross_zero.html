@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Крестики-нолики · классная доска</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Neucha&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --chalk:#f3efe2; --dim:rgba(243,239,226,.62);
+  --x:#ff9db1; --o:#9fd8ff; --y:#ffd97a;
+}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh; color:var(--chalk);
+  font-family:'Rubik',system-ui,sans-serif; overflow-x:hidden;
+  background:
+    radial-gradient(1100px 560px at 75% -10%, rgba(130,180,155,.14), transparent 60%),
+    radial-gradient(900px 520px at -10% 105%, rgba(95,150,125,.12), transparent 55%),
+    linear-gradient(180deg,#182722,#101c17 55%,#0b1310);
+}
+body::after{
+  content:""; position:fixed; inset:0; z-index:20; pointer-events:none; opacity:.07; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+#dust{position:fixed;inset:0;z-index:0;pointer-events:none}
+.room{position:relative;z-index:2;max-width:1120px;margin:0 auto;padding:clamp(18px,4vw,40px) clamp(14px,3.5vw,36px) 26px}
+::selection{background:var(--x);color:#25302a}
+.hidden{display:none!important}
+
+/* ---------- шапка ---------- */
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:clamp(18px,3vw,32px)}
+.brand{display:flex;align-items:center;gap:16px}
+.logo{width:54px;height:54px;flex:none;filter:drop-shadow(0 3px 6px rgba(0,0,0,.45))}
+h1{font-family:'Neucha',cursive;font-weight:400;font-size:clamp(2.3rem,5.5vw,3.6rem);line-height:1;
+   text-shadow:0 0 12px rgba(243,239,226,.18), 0 2px 4px rgba(0,0,0,.45)}
+.sub{font-size:.74rem;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);margin-top:8px}
+.scribble{display:block;width:180px;height:12px;margin-top:6px}
+.scribble path{stroke:var(--y);stroke-width:3;fill:none;stroke-linecap:round;filter:url(#chalkF)}
+.icon-btn{
+  display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  background:none;color:var(--dim);font-family:'Neucha',cursive;font-size:1.05rem;
+  border:2px solid rgba(243,239,226,.5);border-radius:14px 5px 16px 6px/6px 16px 5px 14px;
+  padding:.4em .95em;transition:.2s;
+}
+.icon-btn:hover{color:var(--chalk);transform:translateY(-2px);border-color:rgba(243,239,226,.8)}
+.icon-btn svg{width:20px;height:20px}
+.icon-btn .off,.icon-btn .off-lbl{display:none}
+.icon-btn.muted .on,.icon-btn.muted .on-lbl{display:none}
+.icon-btn.muted .off,.icon-btn.muted .off-lbl{display:inline}
+
+/* ---------- сетка страницы ---------- */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:clamp(22px,4vw,46px);align-items:start}
+.board-zone{width:100%;max-width:540px;justify-self:center}
+
+.status{font-family:'Neucha',cursive;font-size:clamp(1.5rem,3.4vw,2.1rem);margin:2px 2px 14px;min-height:1.3em}
+.status .px{color:var(--x)} .status .po{color:var(--o)}
+.dots i{display:inline-block;width:5px;height:5px;margin-left:4px;border-radius:50%;background:var(--o);animation:blink 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes blink{0%,80%,100%{opacity:.2;transform:translateY(0)}40%{opacity:1;transform:translateY(-4px)}}
+
+/* ---------- доска в раме ---------- */
+.frame{
+  position:relative;padding:clamp(10px,1.8vw,16px);border-radius:16px;
+  background:linear-gradient(135deg,#a97a48,#7c4f28 55%,#6b431f);
+  box-shadow:inset 0 2px 2px rgba(255,235,200,.35), inset 0 -4px 8px rgba(40,20,5,.5), 0 24px 50px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.35);
+}
+.frame::before{
+  content:"";position:absolute;inset:0;border-radius:16px;pointer-events:none;
+  background:repeating-linear-gradient(93deg, rgba(60,32,10,.14) 0 2px, transparent 2px 9px, rgba(255,220,170,.07) 9px 11px, transparent 11px 23px);
+}
+.board{
+  position:relative;width:100%;aspect-ratio:1;border-radius:8px;overflow:hidden;margin-bottom:12px;
+  background:
+    radial-gradient(46% 36% at 22% 16%, rgba(255,255,255,.09), transparent 70%),
+    radial-gradient(50% 42% at 82% 84%, rgba(255,255,255,.07), transparent 70%),
+    radial-gradient(30% 26% at 62% 34%, rgba(255,255,255,.05), transparent 70%),
+    linear-gradient(160deg,#33604f,#25453a 60%,#1e392f);
+  box-shadow:inset 0 0 34px rgba(0,0,0,.4), inset 0 0 4px rgba(0,0,0,.5);
+}
+.board::before{
+  content:"";position:absolute;inset:-20%;z-index:1;pointer-events:none;
+  background:radial-gradient(40% 34% at 30% 25%, rgba(255,255,255,.10), transparent 70%);
+  animation:breathe 10s ease-in-out infinite alternate;
+}
+@keyframes breathe{from{opacity:.45;transform:translate(-2%,-1%)}to{opacity:1;transform:translate(3%,2%)}}
+.board::after{
+  content:"";position:absolute;inset:0;z-index:9;pointer-events:none;opacity:.12;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+}
+.grid{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}
+.grid .gline{stroke:rgba(243,239,226,.9);stroke-width:4.5;fill:none;stroke-linecap:round;filter:url(#chalkF)}
+#winLine{stroke:var(--win-c,var(--y));stroke-width:6.5;fill:none;stroke-linecap:round;filter:url(#chalkF);opacity:0}
+
+.cells{position:absolute;inset:0;z-index:3;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr)}
+.cell{
+  appearance:none;-webkit-appearance:none;background:transparent;border:0;position:relative;
+  cursor:pointer;touch-action:manipulation;
+}
+.cell:disabled{cursor:default}
+.board:not(.done) .cell:not(:disabled):hover{background:radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,.07), transparent 70%)}
+.cell:focus-visible{outline:2px dashed rgba(243,239,226,.65);outline-offset:-6px;border-radius:10px}
+.mark{position:absolute;inset:11%;width:78%;height:78%;opacity:0;pointer-events:none;overflow:visible;transition:opacity .18s ease}
+.mark path{stroke-width:7;fill:none;stroke-linecap:round;filter:url(#chalkF)}
+.mx path{stroke:var(--x)} .mo path{stroke:var(--o)}
+.board:not(.done).turn-x .cell.empty:hover .mx,
+.board:not(.done).turn-x .cell.empty:focus-visible .mx{opacity:.28}
+.board:not(.done).turn-o .cell.empty:hover .mo,
+.board:not(.done).turn-o .cell.empty:focus-visible .mo{opacity:.28}
+body.cpu .board.turn-o .cell.empty:hover .mo,
+body.cpu .board.turn-o .cell.empty:focus-visible .mo{opacity:0}
+.cell.x .mx,.cell.o .mo{opacity:1}
+.board.done .cell:not(.win-x):not(.win-o) .mark{opacity:.3}
+.cell.win-x .mx{filter:drop-shadow(0 0 7px rgba(255,157,177,.85));animation:winPulse 1.4s ease .6s 2}
+.cell.win-o .mo{filter:drop-shadow(0 0 7px rgba(159,216,255,.85));animation:winPulse 1.4s ease .6s 2}
+@keyframes winPulse{50%{transform:scale(1.08)}}
+
+.stamp{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.stamp span{
+  font-family:'Neucha',cursive;font-size:clamp(1.9rem,7vw,3.1rem);
+  color:var(--y);border:3px solid currentColor;padding:.12em .55em;
+  border-radius:30px 10px 34px 12px/12px 34px 10px 30px;
+  background:rgba(16,30,25,.6);transform:rotate(-7deg) scale(2.2);opacity:0;text-shadow:0 0 10px rgba(0,0,0,.4);
+}
+.stamp.sx span{color:var(--x)} .stamp.so span{color:var(--o)}
+.stamp.show span{animation:stampIn .55s cubic-bezier(.18,1.6,.4,1) forwards, stampOut .45s ease-in 2s forwards}
+@keyframes stampIn{to{transform:rotate(-7deg) scale(1);opacity:1}}
+@keyframes stampOut{to{transform:rotate(-7deg) scale(.92);opacity:0}}
+
+.wipe{
+  position:absolute;top:-12%;bottom:-12%;left:0;width:130%;z-index:8;pointer-events:none;opacity:0;filter:blur(1px);
+  background:linear-gradient(100deg, transparent 30%, rgba(240,236,225,.4) 45%, rgba(240,236,225,.55) 50%, rgba(240,236,225,.4) 55%, transparent 70%);
+  transform:translateX(-130%) rotate(-8deg);
+}
+.wipe.run{animation:wipe .55s ease-in-out}
+@keyframes wipe{0%{transform:translateX(-130%) rotate(-8deg);opacity:0}15%{opacity:1}100%{transform:translateX(110%) rotate(-8deg);opacity:0}}
+.p{position:absolute;z-index:7;border-radius:50%;pointer-events:none}
+
+/* ---------- лоток с мелом ---------- */
+.tray{display:flex;align-items:center;gap:14px;padding:6px 8px 2px}
+.stick{width:56px;height:11px;border-radius:6px;flex:none;
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.28), inset 0 2px 2px rgba(255,255,255,.5), 0 2px 3px rgba(0,0,0,.35)}
+.stick.x{background:linear-gradient(#ffb9c6,#f2829a);transform:rotate(-2deg)}
+.stick.o{background:linear-gradient(#c3e7ff,#8cc7f2);transform:rotate(1.5deg)}
+.stick.y{width:44px;background:linear-gradient(#ffe3a1,#f2c96b);transform:rotate(-4deg)}
+.eraser-wrap{display:flex;flex-direction:column;align-items:center;gap:5px}
+.eraser{
+  cursor:pointer;border:0;width:86px;height:36px;border-radius:6px;
+  background:linear-gradient(#c9a06a 0 46%, #4c4a45 46%);
+  box-shadow:0 3px 6px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,.45);
+  transition:transform .15s;
+}
+.eraser:hover{transform:translateY(-2px) rotate(-2deg)}
+.eraser:active{transform:translateY(1px)}
+.eraser.pulse{animation:nudge .8s ease 3}
+@keyframes nudge{0%,100%{transform:none}25%{transform:translateX(-5px) rotate(-2deg)}75%{transform:translateX(5px) rotate(2deg)}}
+.tray-label{font-family:'Neucha',cursive;font-size:.95rem;opacity:.75}
+.link-btn{
+  margin-left:auto;background:none;border:0;cursor:pointer;color:var(--dim);
+  font:inherit;font-size:.85rem;letter-spacing:.04em;text-decoration:underline dashed;text-underline-offset:4px;transition:.2s;
+}
+.link-btn:hover{color:var(--y)}
+
+.hint{margin-top:16px;font-size:.84rem;color:var(--dim);opacity:.85}
+kbd{font:600 .75rem 'Rubik';padding:.12em .48em;margin:0 .12em;border:1.5px solid rgba(243,239,226,.4);border-bottom-width:3px;border-radius:5px}
+
+/* ---------- панель ---------- */
+.panel{display:grid;align-content:start;gap:4px;user-select:none}
+.phead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:16px 0 10px}
+.phead:first-child{margin-top:0}
+.phead .link-btn{margin-left:0}
+h2{font-family:'Neucha',cursive;font-weight:400;font-size:1.45rem}
+h2::before{content:"—";color:var(--y);margin-right:.4em}
+.score{
+  display:flex;align-items:baseline;gap:12px;padding:8px 14px;margin-bottom:12px;
+  border:2px solid rgba(243,239,226,.5);transition:transform .2s,background .2s,border-color .2s,box-shadow .2s;
+}
+.sx{border-radius:255px 12px 225px 12px/12px 225px 12px 255px;transform:rotate(-.7deg)}
+.sd{border-radius:12px 255px 12px 225px/225px 12px 255px 12px;transform:rotate(.5deg);border-color:rgba(243,239,226,.3)}
+.so{border-radius:225px 12px 255px 12px/12px 255px 12px 225px;transform:rotate(-.4deg)}
+.who{font-family:'Neucha',cursive;font-size:1.7rem;line-height:1}
+.sx .who{color:var(--x)} .so .who{color:var(--o)} .sd .who{opacity:.55;font-size:1.3rem}
+.cap{flex:1;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.num{font-family:'Neucha',cursive;font-size:1.9rem;display:inline-block;min-width:1.1em;text-align:right}
+.num.pop{animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.4) rotate(-5deg)}100%{transform:scale(1)}}
+.sx.active{border-color:var(--x);background:rgba(255,157,177,.08);box-shadow:0 0 16px rgba(255,157,177,.25);transform:rotate(0) scale(1.02)}
+.so.active{border-color:var(--o);background:rgba(159,216,255,.08);box-shadow:0 0 16px rgba(159,216,255,.25);transform:rotate(0) scale(1.02)}
+
+.seg{display:inline-flex;gap:4px;padding:4px;border:2px solid rgba(243,239,226,.5);
+  border-radius:18px 6px 20px 8px/8px 20px 6px 18px;background:rgba(0,0,0,.14)}
+.seg-btn{
+  font-family:'Neucha',cursive;font-size:1.05rem;color:var(--dim);cursor:pointer;
+  background:none;border:0;padding:.38em .95em;border-radius:12px 5px 14px 6px;transition:.18s;
+}
+.seg-btn:hover{color:var(--chalk);background:rgba(255,255,255,.08)}
+.seg-btn.active{background:var(--chalk);color:#24413a;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.modes{display:grid;gap:10px}
+.note{font-size:.8rem;line-height:1.55;color:var(--dim);margin-top:10px;transition:opacity .16s}
+
+.foot{margin-top:36px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.78rem;color:var(--dim);opacity:.75}
+.icon-btn:focus-visible,.seg-btn:focus-visible,.link-btn:focus-visible,.eraser:focus-visible{outline:2px dashed rgba(243,239,226,.7);outline-offset:3px}
+
+@media (max-width:920px){
+  .layout{grid-template-columns:1fr}
+  .board-zone{max-width:560px}
+  .panel{max-width:560px;width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="chalkF" x="-15%" y="-15%" width="130%" height="130%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4"/>
+    </filter>
+  </defs>
+</svg>
+
+<canvas id="dust" aria-hidden="true"></canvas>
+
+<div class="room">
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M10 12C20 24 29 34 38 45" stroke="#ff9db1" stroke-width="6.5" fill="none" stroke-linecap="round" filter="url(#chalkF)"/>
+        <path d="M38 13C29 26 20 36 11 44" stroke="#ff9db1" stroke-width="6.5" fill="none" stroke-linecap="round" filter="url(#chalkF)"/>
+        <path d="M50 36C59 35 63 46 58 54C52 61 40 58 39 49C38 41 43 36 50 37" stroke="#9fd8ff" stroke-width="5.5" fill="none" stroke-linecap="round" filter="url(#chalkF)"/>
+      </svg>
+      <div>
+        <h1>Крестики&nbsp;–&nbsp;нолики</h1>
+        <p class="sub">классная доска · 3×3</p>
+        <svg class="scribble" viewBox="0 0 180 12" aria-hidden="true"><path d="M3 8C42 3 72 11 102 6C132 2 158 8 177 5"/></svg>
+      </div>
+    </div>
+    <button id="soundBtn" class="icon-btn" aria-pressed="true" title="Звук вкл / выкл">
+      <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+      <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9l6 6"/><path d="M22 9l-6 6"/></svg>
+      <span class="on-lbl">звук</span><span class="off-lbl">тихо</span>
+    </button>
+  </header>
+
+  <main class="layout">
+    <section class="board-zone" aria-label="Игровое поле">
+      <p class="status" id="status" role="status"></p>
+
+      <div class="frame">
+        <div class="board" id="board">
+          <svg class="grid" viewBox="0 0 300 300" aria-hidden="true">
+            <path class="gline" d="M101 8C99 82 104 190 100 292"/>
+            <path class="gline" d="M200 6C203 108 197 212 201 294"/>
+            <path class="gline" d="M8 100C92 97 204 104 292 100"/>
+            <path class="gline" d="M6 199C110 203 214 196 294 201"/>
+            <path id="winLine" d=""/>
+          </svg>
+          <div class="cells" id="cells"></div>
+          <div class="stamp" id="stamp"><span id="stampText"></span></div>
+          <div class="wipe" id="wipe"></div>
+        </div>
+
+        <div class="tray">
+          <span class="stick x"></span><span class="stick o"></span><span class="stick y"></span>
+          <div class="eraser-wrap">
+            <button id="erase" class="eraser" title="Стереть доску (R)" aria-label="Стереть доску"></button>
+            <span class="tray-label">стереть</span>
+          </div>
+          <button id="resetScore" class="link-btn">сбросить счёт</button>
+        </div>
+      </div>
+
+      <p class="hint">клавиши <kbd>1</kbd>–<kbd>9</kbd> поставить знак · <kbd>R</kbd> стереть доску</p>
+    </section>
+
+    <aside class="panel" aria-label="Управление игрой">
+      <div class="phead"><h2>Счёт</h2></div>
+      <ul style="list-style:none">
+        <li class="score sx" id="sxLi"><span class="who">✕</span><span class="cap" id="capX">игрок 1</span><span class="num" id="scoreX">0</span></li>
+        <li class="score sd"><span class="who">·</span><span class="cap">ничьи</span><span class="num" id="scoreD">0</span></li>
+        <li class="score so" id="soLi"><span class="who">○</span><span class="cap" id="capO">игрок 2</span><span class="num" id="scoreO">0</span></li>
+      </ul>
+
+      <div class="phead"><h2>Режим</h2></div>
+      <div class="modes">
+        <div class="seg" role="group" aria-label="Режим игры">
+          <button id="modePvp" class="seg-btn active">двое</button>
+          <button id="modeCpu" class="seg-btn">компьютер</button>
+        </div>
+        <div id="diffRow" class="hidden">
+          <div class="seg" role="group" aria-label="Сложность">
+            <button id="diffEasy" class="seg-btn active">лёгкий</button>
+            <button id="diffHard" class="seg-btn">сложный</button>
+          </div>
+        </div>
+        <p class="note" id="note"></p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="foot">
+    <span>мел · доска · три в ряд</span>
+    <span>счёт и настройки хранятся в этом браузере</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const C = { x:'#ff9db1', o:'#9fd8ff' };
+const KEY = 'chalk-ttt-v1';
+
+const boardEl=$('board'), cellsWrap=$('cells'), statusEl=$('status'),
+      stamp=$('stamp'), stampText=$('stampText'), wipe=$('wipe'), winLine=$('winLine'),
+      eraseBtn=$('erase'), scoreX=$('scoreX'), scoreO=$('scoreO'), scoreD=$('scoreD'),
+      sxLi=$('sxLi'), soLi=$('soLi'), capX=$('capX'), capO=$('capO'),
+      modePvp=$('modePvp'), modeCpu=$('modeCpu'), diffRow=$('diffRow'),
+      diffEasy=$('diffEasy'), diffHard=$('diffHard'), note=$('note'), soundBtn=$('soundBtn');
+
+const state = {
+  board: Array(9).fill(null), turn:'x', over:false, thinking:false, token:0,
+  scores:{x:0,o:0,d:0}, mode:'pvp', diff:'easy'
+};
+let soundOn = true;
+
+/* ---------- клетки ---------- */
+for (let i=0;i<9;i++){
+  const b=document.createElement('button');
+  b.type='button'; b.className='cell empty'; b.dataset.i=i;
+  b.setAttribute('aria-label',`Клетка ${i+1}, пусто`);
+  b.innerHTML =
+    '<svg class="mark mx" viewBox="0 0 100 100" aria-hidden="true"><path d="M23 21C40 38 58 60 78 79"/><path d="M77 22C60 40 42 58 22 78"/></svg>'+
+    '<svg class="mark mo" viewBox="0 0 100 100" aria-hidden="true"><path d="M52 15C76 13 87 38 79 60C70 82 30 87 21 62C14 41 28 17 50 16"/></svg>';
+  cellsWrap.appendChild(b);
+}
+const cells=[...cellsWrap.children];
+cells.forEach(c=>{ c._xp=[...c.querySelectorAll('.mx path')]; c._op=[...c.querySelectorAll('.mo path')]; });
+
+/* ---------- звук (WebAudio, без файлов) ---------- */
+let actx=null;
+function ac(){ try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); return actx; }catch(e){ return null; } }
+function tone(f,t,d,type='triangle',g=.16){
+  const a=ac(); if(!a||!soundOn) return;
+  const o=a.createOscillator(), gn=a.createGain(), t0=a.currentTime+t;
+  o.type=type; o.frequency.value=f;
+  gn.gain.setValueAtTime(0,t0); gn.gain.linearRampToValueAtTime(g,t0+.015);
+  gn.gain.exponentialRampToValueAtTime(.001,t0+d);
+  o.connect(gn).connect(a.destination); o.start(t0); o.stop(t0+d+.05);
+}
+function noise(d,f,q,g){
+  const a=ac(); if(!a||!soundOn) return;
+  const n=(a.sampleRate*d)|0, buf=a.createBuffer(1,n,a.sampleRate), ch=buf.getChannelData(0);
+  for(let i=0;i<n;i++) ch[i]=(Math.random()*2-1)*(1-i/n);
+  const s=a.createBufferSource(); s.buffer=buf;
+  const fl=a.createBiquadFilter(); fl.type='bandpass'; fl.frequency.value=f; fl.Q.value=q;
+  const gn=a.createGain(); gn.gain.value=g;
+  s.connect(fl).connect(gn).connect(a.destination); s.start();
+}
+const sfx={
+  place(){ noise(.06, 1600+Math.random()*900, 1.1, .5); },
+  erase(){
+    const a=ac(); if(!a||!soundOn) return;
+    const d=.25, n=(a.sampleRate*d)|0, buf=a.createBuffer(1,n,a.sampleRate), ch=buf.getChannelData(0);
+    for(let i=0;i<n;i++) ch[i]=(Math.random()*2-1);
+    const s=a.createBufferSource(); s.buffer=buf;
+    const fl=a.createBiquadFilter(); fl.type='bandpass'; fl.Q.value=.9;
+    const t0=a.currentTime; fl.frequency.setValueAtTime(900,t0); fl.frequency.exponentialRampToValueAtTime(180,t0+d);
+    const gn=a.createGain(); gn.gain.setValueAtTime(.4,t0); gn.gain.exponentialRampToValueAtTime(.001,t0+d);
+    s.connect(fl).connect(gn).connect(a.destination); s.start();
+  },
+  win(){ tone(523.25,0,.14); tone(659.25,.11,.14); tone(783.99,.22,.3); },
+  lose(){ tone(392,0,.16); tone(311,.15,.3); },
+  draw(){ tone(330,0,.14); tone(262,.14,.28); },
+  pop(){ tone(660,0,.06,'square',.05); }
+};
+
+/* ---------- сохранение ---------- */
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({s:state.scores,m:state.mode,d:state.diff,snd:soundOn})); }catch(e){} }
+function load(){
+  try{
+    const v=JSON.parse(localStorage.getItem(KEY)); if(!v) return;
+    if(v.s) state.scores=v.s;
+    if(v.m) state.mode=v.m;
+    if(v.d) state.diff=v.d;
+    if(typeof v.snd==='boolean') soundOn=v.snd;
+  }catch(e){}
+}
+
+/* ---------- отрисовка знаков ---------- */
+function animateMark(cell,p){
+  const paths = p==='x'?cell._xp:cell._op;
+  paths.forEach((path,idx)=>{
+    const len=path.getTotalLength();
+    path.style.transition='none';
+    path.style.strokeDasharray=len; path.style.strokeDashoffset=len;
+    void path.getBoundingClientRect();
+    path.style.transition=`stroke-dashoffset ${p==='o'?0.5:0.32}s cubic-bezier(.45,.05,.35,1) ${idx*0.14}s`;
+    path.style.strokeDashoffset='0';
+  });
+}
+function wobbly(x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1;
+  const nx=-dy/L, ny=dx/L, w=Math.random()*10-5;
+  return `M ${x1} ${y1} Q ${(x1+x2)/2+nx*w} ${(y1+y2)/2+ny*w} ${x2} ${y2}`;
+}
+function drawWinLine(line){
+  const a=[(line[0]%3)*100+50, Math.floor(line[0]/3)*100+50];
+  const b=[(line[2]%3)*100+50, Math.floor(line[2]/3)*100+50];
+  const dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1;
+  const ex=dx/L*26, ey=dy/L*26;
+  winLine.setAttribute('d', wobbly(a[0]-ex,a[1]-ey,b[0]+ex,b[1]+ey));
+  const len=winLine.getTotalLength();
+  winLine.style.transition='none';
+  winLine.style.strokeDasharray=len; winLine.style.strokeDashoffset=len;
+  void winLine.getBoundingClientRect();
+  winLine.style.transition='stroke-dashoffset .55s cubic-bezier(.3,.8,.3,1) .12s';
+  winLine.style.opacity='1'; winLine.style.strokeDashoffset='0';
+}
+function burstAtCell(i,color,n){
+  const cx=((i%3)+.5)/3*100, cy=(Math.floor(i/3)+.5)/3*100;
+  for(let k=0;k<n;k++){
+    const el=document.createElement('span'); el.className='p';
+    const s=2+Math.random()*4;
+    el.style.cssText=`left:${cx+(Math.random()-.5)*20}%;top:${cy+(Math.random()-.5)*20}%;width:${s}px;height:${s}px;background:${color}`;
+    boardEl.appendChild(el);
+    const dx=(Math.random()-.5)*110, dy=(Math.random()-.5)*110-15;
+    el.animate([{transform:'translate(0,0) scale(1)',opacity:.95},
+                {transform:`translate(${dx}px,${dy}px) scale(.15)`,opacity:0}],
+               {duration:520+Math.random()*420, easing:'cubic-bezier(.2,.6,.3,1)'}).onfinish=()=>el.remove();
+  }
+}
+
+/* ---------- ходы и победа ---------- */
+function emptyCells(){ const r=[]; state.board.forEach((v,i)=>{ if(!v) r.push(i); }); return r; }
+function findWin(b,p){ for(const l of WINS) if(l.every(i=>b[i]===p)) return l; return null; }
+function fm(b,p){
+  for(const L of WINS){
+    const e=L.filter(i=>!b[i]);
+    if(e.length===1 && L.filter(i=>b[i]===p).length===2) return e[0];
+  }
+  return null;
+}
+function minimax(b,turn){
+  if(findWin(b,'o')) return 10;
+  if(findWin(b,'x')) return -10;
+  if(!b.includes(null)) return 0;
+  const best = turn==='o'?-Infinity:Infinity;
+  for(const i of emptyCells()){
+    b[i]=turn;
+    const v=minimax(b, turn==='o'?'x':'o');
+    b[i]=null;
+    if(turn==='o') best=Math.max(best,v); else best=Math.min(best,v);
+  }
+  return best;
+}
+function bestMove(){
+  const b=state.board; let best=-2, mi=-1;
+  for(const i of emptyCells()){
+    b[i]='o';
+    let sc;
+    if(findWin(b,'o')) sc=10;
+    else if(!b.includes(null)) sc=0;
+    else sc=-minimax(b,'x');
+    b[i]=null;
+    if(sc>best){ best=sc; mi=i; }
+  }
+  return mi;
+}
+function pickMove(){
+  const b=state.board;
+  const w=fm(b,'o'); if(w!=null) return w;
+  if(state.diff==='hard') return bestMove();
+  const blk=fm(b,'x');
+  if(blk!=null && Math.random()<.65) return blk;
+  const e=emptyCells();
+  return e[Math.floor(Math.random()*e.length)];
+}
+
+function place(i, byCpu=false){
+  if(state.over || state.board[i]) return;
+  if(!byCpu && state.mode==='cpu' && state.turn==='o') return;
+  state.board[i]=state.turn;
+  const cell=cells[i];
+  cell.classList.remove('empty');
+  cell.classList.add(state.turn);
+  cell.setAttribute('aria-label',`Клетка ${i+1}, ${state.turn==='x'?'крестик':'нолик'}`);
+  animateMark(cell,state.turn);
+  sfx.place();
+  burstAtCell(i, state.turn==='x'?C.x:C.o, 7);
+
+  const line=findWin(state.board,state.turn);
+  if(line) return endGame(state.turn,line);
+  if(!state.board.includes(null)) return endGame(null,null);
+
+  state.turn = state.turn==='x'?'o':'x';
+  updateTurnUI();
+  if(state.mode==='cpu' && state.turn==='o') cpuThink();
+}
+
+function cpuThink(){
+  state.thinking=true;
+  const token=state.token;
+  setTimeout(()=>{
+    if(token!==state.token || state.over) return;
+    state.thinking=false;
+    const m=pickMove();
+    if(m!=null) place(m,true);
+  }, 620+Math.random()*520);
+}
+
+function endGame(winner,line){
+  state.over=true;
+  boardEl.classList.add('done');
+  sxLi.classList.remove('active'); soLi.classList.remove('active');
+  if(winner){
+    const wc = winner==='x'?'win-x':'win-o';
+    line.forEach(i=>cells[i].classList.add('win',wc));
+    boardEl.style.setProperty('--win-c', winner==='x'?C.x:C.o);
+    drawWinLine(line);
+    line.forEach((i,k)=>setTimeout(()=>burstAtCell(i, winner==='x'?C.x:C.o, 14), 200+k*90));
+    state.scores[winner]++; renderScores(); popScore(winner);
+    const cpu = state.mode==='cpu';
+    statusEl.innerHTML = cpu
+      ? (winner==='x' ? 'Вы победили! Отличная партия' : 'Компьютер победил. Реванш?')
+      : (winner==='x' ? '<span class="px">✕</span> побеждает!' : '<span class="po">○</span> побеждает!');
+    showStamp(cpu ? (winner==='x'?'Победа!':'Минус очко') : (winner==='x'?'✕ победа!':'○ победа!'), winner==='x'?'sx':'so');
+    (winner==='x'?sfx.win:sfx.lose)();
+  } else {
+    state.scores.d++; renderScores(); popScore('d');
+    statusEl.innerHTML='Ничья! Доска занята целиком';
+    showStamp('Ничья!','sd'); sfx.draw();
+  }
+  eraseBtn.classList.add('pulse');
+  setTimeout(()=>eraseBtn.classList.remove('pulse'),2600);
+  save();
+}
+function showStamp(text,cls){
+  stampText.textContent=text;
+  stamp.classList.remove('show','sx','so','sd');
+  void stamp.offsetWidth;
+  stamp.classList.add('show',cls);
+}
+
+/* ---------- интерфейс хода ---------- */
+function updateTurnUI(){
+  boardEl.classList.toggle('turn-x',state.turn==='x');
+  boardEl.classList.toggle('turn-o',state.turn==='o');
+  sxLi.classList.toggle('active',!state.over&&state.turn==='x');
+  soLi.classList.toggle('active',!state.over&&state.turn==='o');
+  statusEl.innerHTML = state.mode==='cpu'
+    ? (state.turn==='x' ? 'Ваш ход — ставьте <span class="px">✕</span>'
+                        : 'Компьютер думает<span class="dots"><i></i><i></i><i></i></span>')
+    : (state.turn==='x' ? 'Ходит <span class="px">✕</span>'
+                        : 'Ходит <span class="po">○</span>');
+}
+function renderScores(){
+  scoreX.textContent=state.scores.x;
+  scoreO.textContent=state.scores.o;
+  scoreD.textContent=state.scores.d;
+}
+function popScore(k){
+  const el={x:scoreX,o:scoreO,d:scoreD}[k];
+  el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  sfx.pop();
+}
+function noteText(){
+  if(state.mode==='pvp') return 'Один экран на двоих: ходите по очереди, кто соберёт три в ряд — тому и очко.';
+  return state.diff==='easy'
+    ? 'Компьютер играет мягко и иногда оговаривается. ○ — это он.'
+    : 'Сложный ИИ считает всё наперёд. Победить реально, но не всегда. ○ — это он.';
+}
+function setNote(t){ note.style.opacity=0; setTimeout(()=>{ note.textContent=t; note.style.opacity=1; },160); }
+
+/* ---------- стереть / режимы ---------- */
+function clearBoard(wipeOn=true){
+  state.token++; state.over=false; state.thinking=false;
+  state.board=Array(9).fill(null); state.turn='x';
+  boardEl.classList.remove('done');
+  cells.forEach((c,i)=>{
+    c.classList.remove('x','o','win','win-x','win-o');
+    c.classList.add('empty');
+    c.setAttribute('aria-label',`Клетка ${i+1}, пусто`);
+  });
+  winLine.style.transition='none'; winLine.style.opacity='0';
+  stamp.classList.remove('show','sx','so','sd');
+  eraseBtn.classList.remove('pulse');
+  updateTurnUI();
+  if(wipeOn){
+    wipe.classList.remove('run'); void wipe.offsetWidth; wipe.classList.add('run');
+    sfx.erase();
+  }
+}
+function setMode(m){
+  state.mode=m;
+  document.body.classList.toggle('cpu',m==='cpu');
+  modePvp.classList.toggle('active',m==='pvp');
+  modeCpu.classList.toggle('active',m==='cpu');
+  diffRow.classList.toggle('hidden',m!=='cpu');
+  capX.textContent = m==='cpu'?'вы':'игрок 1';
+  capO.textContent = m==='cpu'?'компьютер':'игрок 2';
+  setNote(noteText());
+  clearBoard(true);
+  save();
+}
+function setDiff(d){
+  state.diff=d;
+  diffEasy.classList.toggle('active',d==='easy');
+  diffHard.classList.toggle('active',d==='hard');
+  setNote(noteText());
+  save();
+}
+function applySoundBtn(){
+  soundBtn.classList.toggle('muted',!soundOn);
+  soundBtn.setAttribute('aria-pressed',soundOn);
+}
+
+/* ---------- события ---------- */
+cellsWrap.addEventListener('click',e=>{
+  const t=e.target.closest('.cell');
+  if(t) place(+t.dataset.i);
+});
+modePvp.addEventListener('click',()=>setMode('pvp'));
+modeCpu.addEventListener('click',()=>setMode('cpu'));
+diffEasy.addEventListener('click',()=>setDiff('easy'));
+diffHard.addEventListener('click',()=>setDiff('hard'));
+eraseBtn.addEventListener('click',()=>clearBoard(true));
+$('resetScore').addEventListener('click',()=>{
+  state.scores={x:0,o:0,d:0}; renderScores();
+  ['x','o','d'].forEach(popScore); save();
+});
+soundBtn.addEventListener('click',()=>{ soundOn=!soundOn; applySoundBtn(); save(); });
+window.addEventListener('keydown',e=>{
+  if(e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k=e.key.toLowerCase();
+  if(k>='1' && k<='9') place(+k-1);
+  else if(k==='r' || k==='к') clearBoard(true);
+});
+
+/* ---------- фоновая меловая пыль ---------- */
+const cv=$('dust'), ctx2=cv.getContext('2d'); let ps=[];
+function sizeCv(){
+  cv.width=innerWidth; cv.height=innerHeight;
+  const n=Math.min(70,Math.floor(innerWidth*innerHeight/26000));
+  ps=Array.from({length:n},()=>({
+    x:Math.random()*cv.width, y:Math.random()*cv.height,
+    r:.6+Math.random()*1.8, v:.12+Math.random()*.35,
+    ph:Math.random()*6.28, a:.04+Math.random()*.12
+  }));
+}
+sizeCv(); addEventListener('resize',sizeCv);
+(function loop(){
+  ctx2.clearRect(0,0,cv.width,cv.height);
+  ctx2.fillStyle='#f3efe2';
+  for(const p of ps){
+    p.y-=p.v; p.ph+=.01; p.x+=Math.sin(p.ph)*.15;
+    if(p.y<-4){ p.y=cv.height+4; p.x=Math.random()*cv.width; }
+    ctx2.globalAlpha=p.a*(.6+.4*Math.sin(p.ph*2));
+    ctx2.beginPath(); ctx2.arc(p.x,p.y,p.r,0,7); ctx2.fill();
+  }
+  ctx2.globalAlpha=1;
+  requestAnimationFrame(loop);
+})();
+
+/* ---------- старт ---------- */
+load();
+document.body.classList.toggle('cpu',state.mode==='cpu');
+modePvp.classList.toggle('active',state.mode==='pvp');
+modeCpu.classList.toggle('active',state.mode==='cpu');
+diffRow.classList.toggle('hidden',state.mode!=='cpu');
+diffEasy.classList.toggle('active',state.diff==='easy');
+diffHard.classList.toggle('active',state.diff==='hard');
+capX.textContent = state.mode==='cpu'?'вы':'игрок 1';
+capO.textContent = state.mode==='cpu'?'компьютер':'игрок 2';
+note.textContent = noteText();
+applySoundBtn();
+renderScores();
+clearBoard(false);
+setTimeout(()=>{
+  document.querySelectorAll('.gline').forEach((p,idx)=>{
+    const len=p.getTotalLength();
+    p.style.transition='none';
+    p.style.strokeDasharray=len; p.style.strokeDashoffset=len;
+    void p.getBoundingClientRect();
+    p.style.transition=`stroke-dashoffset .8s ease ${.15+idx*.15}s`;
+    p.style.strokeDashoffset='0';
+  });
+},120);
+})();
+</script>
+</body>
+</html>
